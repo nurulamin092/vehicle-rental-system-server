@@ -37,8 +37,37 @@ const getSingleUser = async (id: string) => {
   return result;
 };
 
+const updatedUser = async (id: string, payload: any) => {
+  const fields = [];
+
+  const values = [];
+
+  let index = 1;
+
+  for (const key in payload) {
+    fields.push(`${key}=$${index}`);
+    values.push(payload[key]);
+    index++;
+  }
+
+  fields.push(`updated_at =NOW()`);
+
+  values.push(id);
+
+  const result = await pool.query(
+    `
+    UPDATE users SET ${fields.join(", ")}
+    WHERE id = $${index} RETURNING *
+    `,
+    values
+  );
+
+  return result;
+};
+
 export const userServices = {
   createUser,
   getAllUser,
   getSingleUser,
+  updatedUser,
 };

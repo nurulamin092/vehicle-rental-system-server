@@ -51,8 +51,29 @@ const getSingleUser = async (req: Request, res: Response) => {
     });
   }
 };
+
+const updatedUser = async (req: Request, res: Response) => {
+  try {
+    const userId = req.params.userId;
+    const payload = req.body;
+
+    const result = await userServices.updatedUser(userId as string, payload);
+
+    res.status(200).json({
+      success: false,
+      message: "user update successfully",
+      data: result.rows[0],
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
 export const usersController = {
   createUser,
   getAllUser,
   getSingleUser,
+  updatedUser,
 };
