@@ -9,5 +9,6 @@ router.get("/", vehicleControllers.getAllVehicle);
 
 router.get("/:vehicleId", vehicleControllers.getSingleUser);
 router.put("/:vehicleId", vehicleControllers.updatedVehicle);
+router.delete("/:vehicleId", vehicleControllers.deleteVehicle);
 
 export const vehicleRouter = router;
