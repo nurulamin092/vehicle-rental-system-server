@@ -42,9 +42,20 @@ const getSingleUser = async (id: string) => {
 const updatedUser = async (id: string, payload: any) => {
   const fields = [];
 
-  const values = [];
+  const values: any[] = [];
 
   let index = 1;
+
+  if (payload.password) {
+    if (payload.password.length < 6) {
+      throw new Error("password must be 6 characters.");
+    }
+    payload.password = await bcrypt.hash(payload.password, 10);
+  }
+
+  if (payload.email) {
+    payload.email = payload.email.toLowerCase();
+  }
 
   for (const key in payload) {
     fields.push(`${key}=$${index}`);
@@ -52,7 +63,7 @@ const updatedUser = async (id: string, payload: any) => {
     index++;
   }
 
-  fields.push(`updated_at =NOW()`);
+  fields.push(`updated_at = NOW()`);
 
   values.push(id);
 

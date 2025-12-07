@@ -22,7 +22,7 @@ const getAllUser = async (req: Request, res: Response) => {
   try {
     const result = await userServices.getAllUser();
     res.status(200).json({
-      success: false,
+      success: true,
       message: "Fetched all user",
       data: result.rows,
     });
@@ -39,6 +39,12 @@ const getSingleUser = async (req: Request, res: Response) => {
     const userId = req.params.userId;
     const result = await userServices.getSingleUser(userId!);
 
+    if (result.rowCount === 0) {
+      res.status(404).json({
+        success: false,
+        message: "User not found!",
+      });
+    }
     res.status(200).json({
       success: true,
       message: "user retrieved successfully",
@@ -60,7 +66,7 @@ const updatedUser = async (req: Request, res: Response) => {
     const result = await userServices.updatedUser(userId as string, payload);
 
     res.status(200).json({
-      success: false,
+      success: true,
       message: "user update successfully",
       data: result.rows[0],
     });
