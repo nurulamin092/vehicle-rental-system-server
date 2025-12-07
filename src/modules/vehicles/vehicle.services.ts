@@ -14,6 +14,16 @@ const createVehicle = async (payload: any) => {
   return result;
 };
 
+const getAllVehicle = async () => {
+  const result = await pool.query(
+    `
+    SELECT * FROM vehicles 
+    `
+  );
+  return result;
+};
+
 export const vehicleServices = {
   createVehicle,
+  getAllVehicle,
 };
