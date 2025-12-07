@@ -6,6 +6,7 @@ export const pool = new Pool({
 });
 
 const initDb = async () => {
+  //? user? tables
   await pool.query(
     `
     CREATE TABLE IF NOT EXISTS users(
@@ -21,6 +22,7 @@ const initDb = async () => {
     `
   );
 
+  //? vehicle table
   await pool.query(`
   CREATE TABLE IF NOT EXISTS vehicles(
   id SERIAL PRIMARY KEY,
@@ -32,6 +34,25 @@ const initDb = async () => {
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW())  
  `);
+
+  //? booking tables
+
+  await pool.query(
+    `
+    CREATE TABLE IF NOT EXISTS bookings(
+    id SERIAL PRIMARY KEY,
+    customer_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    vehicle_id INT NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
+    rent_start_date DATE NOT NULL,
+    rent_end_date DATE NOT NULL,
+    total_price NUMERIC (10,2) NOT NULL CHECK (total_price>0),
+    status VARCHAR (50) NOT NULL CHECK (status IN ('active','cancelled','returned')),
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    CHECK(rent_end_date>rent_start_date)
+    )
+    `
+  );
 
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower_idx ON users (LOWER(email))
