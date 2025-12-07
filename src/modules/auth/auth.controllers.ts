@@ -5,7 +5,7 @@ const signup = async (req: Request, res: Response) => {
   try {
     const payload = req.body;
     const user = await authServices.signup(payload);
-    res.status(200).json({
+    res.status(201).json({
       success: true,
       message: "User register successfully",
       data: user,
@@ -18,6 +18,24 @@ const signup = async (req: Request, res: Response) => {
   }
 };
 
+const signin = async (req: Request, res: Response) => {
+  try {
+    const payload = req.body;
+    const result = await authServices.signin(payload);
+
+    res.status(200).json({
+      success: true,
+      message: "Login successfully",
+      data: result,
+    });
+  } catch (err: any) {
+    res.status(400).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
 export const authController = {
   signup,
+  signin,
 };
