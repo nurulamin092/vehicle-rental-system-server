@@ -51,7 +51,35 @@ const getAllBookings = async () => {
   return result;
 };
 
+const updateBooking = async (bookingId: string) => {
+  const booking = await pool.query(
+    `
+  SELECT * FROM bookings WHERE id=$1
+  `,
+    [bookingId]
+  );
+
+  if (booking.rows.length === 0) {
+    throw new Error("Booking not found");
+  }
+  const vehicleId = booking.rows[0].vehicle_id;
+
+  await pool.query(
+    `
+    UPDATE bookings SET status='returned' WHERE id=$1`,
+    [bookingId]
+  );
+
+  await pool.query(
+    `
+    UPDATE vehicles SET availability_status='available' WHERE id=$1`,
+    [vehicleId]
+  );
+  return booking;
+};
+
 export const bookingServices = {
   createBooing,
   getAllBookings,
+  updateBooking,
 };
