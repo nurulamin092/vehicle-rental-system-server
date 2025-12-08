@@ -4,12 +4,8 @@ import jwt from "jsonwebtoken";
 import config from "../config";
 import { pool } from "../config/database";
 
-export interface AuthRequest extends Request {
-  user?: any;
-}
-
 const authenticate = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ) => {
@@ -64,7 +60,7 @@ const authenticate = async (
 };
 
 const authorize = (...roles: string[]) => {
-  return (req: AuthRequest, res: Response, next: NextFunction) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({
         success: false,

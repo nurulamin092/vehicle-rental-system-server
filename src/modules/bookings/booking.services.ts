@@ -1,47 +1,89 @@
 import { pool } from "../../config/database";
 
-const createBooing = async (payload: any) => {
+export interface CreateBookingPayload {
+  customer_id: number;
+  vehicle_id: number;
+  rent_start_date: string;
+  rent_end_date: string;
+}
+
+const createBooing = async (payload: CreateBookingPayload) => {
   const { customer_id, vehicle_id, rent_start_date, rent_end_date } = payload;
 
-  const vehicle = await pool.query(
-    `
-    SELECT * FROM vehicles WHERE id=$1 AND  availability_status ='available'
-    `,
-    [vehicle_id]
-  );
+  const start = new Date(rent_start_date);
 
-  if (vehicle.rows.length === 0) {
-    throw new Error("Vehicle not available to booking");
-  }
+  const end = new Date(rent_end_date);
 
-  const daily_price = Number(vehicle.rows[0].daily_rent_price);
+  const msPerDay = 1000 * 60 * 60 * 24;
 
-  const days =
-    (new Date(rent_end_date).getTime() - new Date(rent_start_date).getTime()) /
-    (1000 * 60 * 60 * 24);
+  const days = Math.round((end.getTime() - start.getTime()) / msPerDay);
 
   if (days <= 0) {
-    throw new Error("End date must be after start date");
+    const err: any = new Error("End date must be after start date");
+    err.status = 400;
+    throw err;
   }
 
-  const total_price = days * daily_price;
+  const client = await pool.connect();
 
-  const result = await pool.query(
-    `
+  try {
+    await client.query("BEGIN");
+
+    const vehicleRegistrationNumber = await client.query(
+      `
+      SELECT id ,vehicle_name , daily_rent_price,availability_status FROM vehicles WHERE id=$1 FOR UPDATE
+      `,
+      [vehicle_id]
+    );
+
+    if (vehicleRegistrationNumber.rowCount === 0) {
+      const err: any = new Error("Vehicle not found");
+      err.status = 404;
+      throw err;
+    }
+
+    const vehicle = vehicleRegistrationNumber.rows[0];
+
+    if (vehicle.availability_status !== "available") {
+      const err: any = new Error("Vehicle not available to booking");
+      err.status = 400;
+      throw err;
+    }
+
+    const daily_price = Number(vehicle.daily_rent_price);
+
+    const total_price = (daily_price * days).toFixed(2);
+
+    const result = await client.query(
+      `
     INSERT INTO bookings (customer_id, vehicle_id, rent_start_date, rent_end_date,total_price,status)
-    VALUES ($1, $2, $3, $4, $5, 'active') RETURNING *
-    `,
-    [customer_id, vehicle_id, rent_start_date, rent_end_date, total_price]
-  );
+    VALUES ($1, $2, $3, $4, $5, 'active') RETURNING id, customer_id, vehicle_id, rent_start_date, 
+    rent_end_date,total_price,status`,
+      [customer_id, vehicle_id, rent_start_date, rent_end_date, total_price]
+    );
 
-  await pool.query(
-    `
-    UPDATE vehicles SET availability_status='booked' WHERE id=$1
+    await client.query(
+      `
+    UPDATE vehicles SET availability_status='booked', updated_at = NOW() WHERE id=$1
     `,
-    [vehicle_id]
-  );
+      [vehicle_id]
+    );
 
-  return result;
+    await client.query("COMMIT");
+
+    const booking = result.rows[0];
+
+    booking.vehicle = {
+      vehicle_name: vehicle.vehicle_name,
+      daily_rent_price: Number(vehicle.daily_rent_price),
+    };
+    return booking;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 };
 
 const getAllBookings = async () => {

@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import { userServices } from "./user.services";
-import { AuthRequest } from "../../middleware/auth";
 
 const getAllUser = async (req: Request, res: Response) => {
   try {
@@ -42,13 +41,13 @@ const getSingleUser = async (req: Request, res: Response) => {
   }
 };
 
-const updatedUser = async (req: AuthRequest, res: Response) => {
+const updatedUser = async (req: Request, res: Response) => {
   try {
     const userId = req.params.userId;
     const payload = req.body;
 
     if (
-      !(req.user.role === "admin" || String(req.user.id) === String(userId))
+      !(req.user?.role === "admin" || String(req.user?.id) === String(userId))
     ) {
       return res.status(403).json({
         success: false,
@@ -56,7 +55,7 @@ const updatedUser = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    if (payload.role && req.user.role !== "admin") {
+    if (payload.role && req.user?.role !== "admin") {
       return res.status(403).json({
         success: false,
         message: "Only admin can change role",
@@ -77,12 +76,12 @@ const updatedUser = async (req: AuthRequest, res: Response) => {
   }
 };
 
-const deleteUser = async (req: AuthRequest, res: Response) => {
+const deleteUser = async (req: Request, res: Response) => {
   try {
     const userId = req.params.userId;
     const result = await userServices.deleteUser(userId!);
 
-    if (req.user.role !== "admin") {
+    if (req.user?.role !== "admin") {
       return res.status(403).json({ success: false, message: "Forbidden" });
     }
 
