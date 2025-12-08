@@ -28,7 +28,7 @@ const validateCreateBooking = (payload: any) => {
   return { valid: errors.length === 0, errors, start, end };
 };
 
-const validateUpdateBooking = async (payload: any) => {
+const validateUpdateBooking = (payload: any) => {
   const errors: string[] = [];
   if (!payload || (!payload.status && payload.status !== "")) {
     errors.push("status is required");

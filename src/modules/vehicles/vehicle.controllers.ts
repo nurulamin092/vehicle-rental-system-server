@@ -5,7 +5,7 @@ const createVehicle = async (req: Request, res: Response) => {
   try {
     const result = await vehicleServices.createVehicle(req.body);
 
-    res.status(200).json({
+    res.status(201).json({
       success: true,
       message: "vehicle create successfully",
       data: result.rows[0],
@@ -22,7 +22,7 @@ const getAllVehicle = async (req: Request, res: Response) => {
   try {
     const result = await vehicleServices.getAllVehicle();
 
-    res.status(200).json({
+    res.status(201).json({
       success: true,
       message: "All vehicles fetched successfully",
       data: result.rows,
@@ -35,7 +35,7 @@ const getAllVehicle = async (req: Request, res: Response) => {
   }
 };
 
-const getSingleUser = async (req: Request, res: Response) => {
+const getSingleVehicle = async (req: Request, res: Response) => {
   const vehicleId = req.params.vehicleId;
   try {
     const result = await vehicleServices.getSingleVehicle(vehicleId!);
@@ -65,7 +65,7 @@ const updatedVehicle = async (req: Request, res: Response) => {
   try {
     const result = await vehicleServices.updatedVehicle(vehicleId!, req.body);
 
-    res.status(200).json({
+    res.status(201).json({
       success: true,
       message: "Vehicles updates successfully",
       data: result.rows[0],
@@ -88,7 +88,7 @@ const deleteVehicle = async (req: Request, res: Response) => {
         message: "vehicle not found",
       });
     } else {
-      res.status(200).json({
+      res.status(201).json({
         success: true,
         message: "Vehicle deleted successfully",
         data: null,
@@ -104,7 +104,7 @@ const deleteVehicle = async (req: Request, res: Response) => {
 export const vehicleControllers = {
   createVehicle,
   getAllVehicle,
-  getSingleUser,
+  getSingleVehicle,
   updatedVehicle,
   deleteVehicle,
 };

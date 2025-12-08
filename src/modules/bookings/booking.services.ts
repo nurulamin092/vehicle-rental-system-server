@@ -7,7 +7,7 @@ export interface CreateBookingPayload {
   rent_end_date: string;
 }
 
-const createBooing = async (payload: CreateBookingPayload) => {
+const createBooking = async (payload: CreateBookingPayload) => {
   const { customer_id, vehicle_id, rent_start_date, rent_end_date } = payload;
 
   const start = new Date(rent_start_date);
@@ -93,35 +93,220 @@ const getAllBookings = async () => {
   return result;
 };
 
-const updateBooking = async (bookingId: string) => {
-  const booking = await pool.query(
-    `
-  SELECT * FROM bookings WHERE id=$1
+const getBookingForUser = async (user: { id: number; role: string }) => {
+  if (user.role === "admin") {
+    const result = await pool.query(
+      `
+      SELECT 
+      b.id,
+      b.customer_id,
+      b.vehicle_id,
+      b.rent_start_date,
+      b.rent_end_date,
+      b.total_price,
+      b.status,
+      json_build_object
+      ('name',u.name,'email',u.email) AS customer,
+      json_build_object
+      ('vehicle_name',v.vehicle_name,'registration_number',v.registration_number) 
+      AS vehicles
+
+      FROM bookings b
+      JOIN users u ON u.id = b.customer_id
+      JOIN vehicles v ON v.id = b.vehicle_id 
+      ORDER BY b.id DESC
+
+      `
+    );
+
+    return result.rows;
+  } else {
+    const result = await pool.query(
+      `
+      SELECT 
+      b.id,
+      b.customer_id,
+      b.vehicle_id,
+      b.rent_start_date,
+      b.rent_end_date,
+      b.total_price,
+      b.status,
+      json_build_object
+      (
+        'vehicle_name', v.vehicle_name,
+        'registration_number',v.registration_number,
+        'type',v.type
+      ) AS vehicles 
+       FROM bookings b
+      JOIN vehicles v ON v.id = b.vehicle_id WHERE b.customer_id =$1  
+      ORDER BY b.id DESC
   `,
-    [bookingId]
-  );
-
-  if (booking.rows.length === 0) {
-    throw new Error("Booking not found");
+      [user.id]
+    );
+    return result.rows;
   }
-  const vehicleId = booking.rows[0].vehicle_id;
+};
 
-  await pool.query(
-    `
-    UPDATE bookings SET status='returned' WHERE id=$1`,
-    [bookingId]
-  );
+const updateBooking = async (
+  bookingId: number,
+  newStatus: "cancelled" | "returned",
+  currentUser: { id: number; role: string }
+) => {
+  const client = await pool.connect();
 
-  await pool.query(
-    `
-    UPDATE vehicles SET availability_status='available' WHERE id=$1`,
-    [vehicleId]
-  );
-  return booking;
+  try {
+    const bookingResult = await client.query(
+      `
+   SELECT 
+   id,customer_id, vehicle_id, rent_start_date, 
+    rent_end_date,total_price,status FROM bookings WHERE id=$1 FOR UPDATE
+  `,
+      [bookingId]
+    );
+
+    if (bookingResult.rowCount === 0) {
+      const err: any = new Error("Booking not found");
+      err.status = 404;
+      throw err;
+    }
+    const booking = bookingResult.rows[0];
+
+    if (booking.status !== "active") {
+      const err: any = new Error("Only active booking can be updated ");
+      err.status = 400;
+      throw err;
+    }
+
+    const today = new Date();
+
+    const rentStart = new Date(booking.rent_start_date);
+
+    if (newStatus === "cancelled") {
+      if (
+        currentUser.role !== "admin" &&
+        Number(currentUser.id) !== Number(booking.customer_id)
+      ) {
+        const err: any = new Error(
+          "Forbidden: only  booking owner can be cancel "
+        );
+        err.status = 403;
+        throw err;
+      }
+
+      if (today.getTime() >= rentStart.getTime()) {
+        const err: any = new Error(
+          " Can't cancel booking on or after rent_start_date "
+        );
+        err.status = 400;
+        throw err;
+      }
+      await client.query(
+        `
+    UPDATE bookings SET status='cancelled', updated_at=NOW() WHERE id=$1`,
+        [bookingId]
+      );
+      await pool.query(
+        `
+    UPDATE vehicles SET availability_status='available', updated_at = NOW() WHERE id=$1`,
+        [booking.vehicle_id]
+      );
+
+      await client.query("COMMIT");
+
+      const out = {
+        id: booking.id,
+        customer_id: booking.customer_id,
+        vehicle_id: booking.vehicle_id,
+        rent_start_date: booking.rent_start_date,
+        rent_end_date: booking.rent_end_date,
+        total_price: booking.total_price,
+        status: "cancelled",
+      };
+
+      return out;
+    }
+
+    if (newStatus === "returned") {
+      if (currentUser.role !== "admin") {
+        const err: any = new Error(
+          "Forbidden: only  admin  can mark returned "
+        );
+        err.status = 403;
+        throw err;
+      }
+
+      await client.query(
+        `
+    UPDATE bookings SET status='cancelled', updated_at=NOW() WHERE id=$1`,
+        [bookingId]
+      );
+      await pool.query(
+        `
+    UPDATE vehicles SET availability_status='available', updated_at = NOW() WHERE id=$1`,
+        [booking.vehicle_id]
+      );
+      await client.query("COMMIT");
+
+      const out = {
+        id: booking.id,
+        customer_id: booking.customer_id,
+        vehicle_id: booking.vehicle_id,
+        rent_start_date: booking.rent_start_date,
+        rent_end_date: booking.rent_end_date,
+        total_price: booking.total_price,
+        status: "returned",
+        vehicle: { availability_status: "available" },
+      };
+
+      return out;
+    }
+
+    throw Error("Unsupported status");
+  } catch (err: any) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+const autoReturnExpiredBookings = async () => {
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const result = await client.query(`
+      SELECT id, vehicle_id FROM bookings WHERE
+       status = 'active' AND rent_end_date < CURRENT_DATE FOR UPDATE`);
+    for (const row of result.rows) {
+      const bookingId = row.id;
+      const vehicleId = row.vehicle_id;
+      await client.query(
+        `
+    UPDATE bookings SET status='returned', updated_at=NOW() WHERE id=$1`,
+        [bookingId]
+      );
+      await pool.query(
+        `
+    UPDATE vehicles SET availability_status='available', updated_at = NOW() WHERE id=$1`,
+        [vehicleId]
+      );
+    }
+    await client.query("COMMIT");
+    return { updated: result.rowCount };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 };
 
 export const bookingServices = {
-  createBooing,
+  createBooking,
   getAllBookings,
+  getBookingForUser,
   updateBooking,
+  autoReturnExpiredBookings,
 };

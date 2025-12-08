@@ -13,7 +13,7 @@ router.post(
 
 router.get("/", vehicleControllers.getAllVehicle);
 
-router.get("/:vehicleId", vehicleControllers.getSingleUser);
+router.get("/:vehicleId", vehicleControllers.getSingleVehicle);
 router.put(
   "/:vehicleId",
   auth.authenticate,
