@@ -9,4 +9,6 @@ const config = {
   jwt_secret: process.env.JWT_SECRET,
 };
 
+console.log("JWT SECRET from ENV:", config.jwt_secret);
+
 export default config;

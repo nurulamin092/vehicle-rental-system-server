@@ -1,22 +1,6 @@
 import { Request, Response } from "express";
 import { userServices } from "./user.services";
-
-const createUser = async (req: Request, res: Response) => {
-  try {
-    const result = await userServices.createUser(req.body);
-
-    res.status(201).json({
-      success: true,
-      message: "User create successfully",
-      data: result.rows[0],
-    });
-  } catch (err: any) {
-    res.status(500).json({
-      success: false,
-      message: err.message,
-    });
-  }
-};
+import { AuthRequest } from "../../middleware/auth";
 
 const getAllUser = async (req: Request, res: Response) => {
   try {
@@ -58,43 +42,61 @@ const getSingleUser = async (req: Request, res: Response) => {
   }
 };
 
-const updatedUser = async (req: Request, res: Response) => {
+const updatedUser = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.params.userId;
     const payload = req.body;
 
+    if (
+      !(req.user.role === "admin" || String(req.user.id) === String(userId))
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden",
+      });
+    }
+
+    if (payload.role && req.user.role !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Only admin can change role",
+      });
+    }
     const result = await userServices.updatedUser(userId as string, payload);
 
     res.status(200).json({
       success: true,
       message: "user update successfully",
-      data: result.rows[0],
+      data: result.rows ? result.rows[0] : null,
     });
   } catch (err: any) {
-    res.status(500).json({
+    res.status(400).json({
       success: false,
       message: err.message,
     });
   }
 };
 
-const deleteUser = async (req: Request, res: Response) => {
+const deleteUser = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.params.userId;
     const result = await userServices.deleteUser(userId!);
 
-    if (result.rowCount === 0) {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Forbidden" });
+    }
+
+    if (!result) {
       res.status(404).json({
         success: false,
         message: "User not found!",
       });
-    } else {
-      res.status(200).json({
-        success: true,
-        message: "User delete successfully",
-        data: null,
-      });
     }
+    res.status(200).json({
+      success: true,
+      message: "User delete successfully",
+      data: null,
+    });
   } catch (err: any) {
     res.status(500).json({
       success: false,
@@ -103,7 +105,6 @@ const deleteUser = async (req: Request, res: Response) => {
   }
 };
 export const usersController = {
-  createUser,
   getAllUser,
   getSingleUser,
   updatedUser,
