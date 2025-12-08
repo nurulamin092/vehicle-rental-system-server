@@ -12,5 +12,10 @@ router.get(
 );
 // router.get("/:userId", auth.authenticate, usersController.getSingleUser);
 router.put("/:userId", auth.authenticate, usersController.updatedUser);
-router.delete("/:userId", auth.authenticate, usersController.deleteUser);
+router.delete(
+  "/:userId",
+  auth.authenticate,
+  auth.authorize("admin"),
+  usersController.deleteUser
+);
 export const userRouter = router;
